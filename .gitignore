@@ -1,0 +1,5 @@
+# Ignore server logs
+*.log
+logs/
+
+__pycache__/
