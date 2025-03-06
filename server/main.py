@@ -29,6 +29,21 @@ class PongGame:
         self.pong_time_ms = None
         self.is_running = False
 
+    async def _send_ping(self):
+        # Wait before sending the next ping
+        await asyncio.sleep(self.pong_time_ms / 1000)
+
+        # Send ping to the other instance if the game is still running
+        if self.is_running:
+            log(f"⚡ [{self.id}] Sending ping to {self.other_instance_url} after {self.pong_time_ms} ms...")
+            async with httpx.AsyncClient() as client:
+                try:
+                    await client.post(f"{self.other_instance_url}/ping")
+                    log(f"✅ [{self.id}] Successfully sent ping to {self.other_instance_url}")
+                except Exception as e:
+                    log(f"❌ [{self.id}] Failed to ping other instance: {e}. Exception type: {type(e).__name__}, Args: {e.args}")
+
+
     async def ping(self):
         """
         Handle an incoming ping request.
@@ -43,19 +58,9 @@ class PongGame:
         # Respond with pong
         response = {"message": "pong"}
 
-        # Wait before sending the next ping
-        await asyncio.sleep(self.pong_time_ms / 1000)
-
-        # Send ping to the other instance if the game is still running
-        if self.is_running:
-            log(f"⚡ [{self.id}] Sending ping to {self.other_instance_url} after {self.pong_time_ms} ms...")
-            async with httpx.AsyncClient() as client:
-                try:
-                    await client.post(f"{self.other_instance_url}/ping")
-                    log(f"✅ [{self.id}] Successfully sent ping to {self.other_instance_url}")
-                except Exception as e:
-                    log(f"❌ [{self.id}] Failed to ping other instance: {e}")
-
+        # Schedule the next ping without blocking
+        asyncio.create_task(self._send_ping())
+        
         return response
 
     def start_game(self, other_instance_url: str, interval: int):
