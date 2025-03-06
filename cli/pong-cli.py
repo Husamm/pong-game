@@ -4,69 +4,90 @@ import requests
 import time
 import socket
 
-def find_free_port():
-    """Finds an available port dynamically."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))  # Bind to any available port
-        return s.getsockname()[1]
+class PongGameCLI:
+    def __init__(self):
+        self.server1_port = None
+        self.server2_port = None
+        self.server1_url = None
+        self.server2_url = None
+        self.server1_log = None
+        self.server2_log = None
 
-def start_servers():
-    """Finds two available ports and starts both FastAPI servers in detached mode."""
-    port1 = find_free_port()
-    port2 = find_free_port()
+    def find_free_port(self):
+        """Finds an available port dynamically."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))  # Bind to any available port
+            return s.getsockname()[1]
 
-    print(f"Starting server 1 on port {port1}...")
-    server1_process = subprocess.Popen(
-        ["uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(port1)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
-    )
-    time.sleep(1)  # Allow some time for the server to start
+    def start_servers(self):
+        """Finds two available ports and starts both FastAPI servers."""
+        self.server1_port = self.find_free_port()
+        self.server2_port = self.find_free_port()
 
-    print(f"Starting server 2 on port {port2}...")
-    server2_process = subprocess.Popen(
-        ["uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(port2)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
-    )
-    time.sleep(2)  # Allow some time for the second server to start
+        self.server1_url = f"http://127.0.0.1:{self.server1_port}"
+        self.server2_url = f"http://127.0.0.1:{self.server2_port}"
 
-    print(f"✅ Both servers started on ports {port1} and {port2}!")
-    return port1, port2
+        # Create log files based on port numbers
+        self.server1_log = f"server_{self.server1_port}.log"
+        self.server2_log = f"server_{self.server2_port}.log"
 
-def start_game(pong_time_ms):
-    """Start the game by dynamically assigning ports and sending requests to both servers."""
-    print("🚀 Initializing the Pong game...")
+        print(f"Starting server 1 on port {self.server1_port}, logging to {self.server1_log}...")
+        subprocess.Popen(
+            ["uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.server1_port)],
+            stdout=open(self.server1_log, "w"), stderr=subprocess.STDOUT, start_new_session=True
+        )
+        time.sleep(1)  # Allow some time for the server to start
 
-    # Start both servers and get their assigned ports
-    port1, port2 = start_servers()
+        print(f"Starting server 2 on port {self.server2_port}, logging to {self.server2_log}...")
+        subprocess.Popen(
+            ["uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.server2_port)],
+            stdout=open(self.server2_log, "w"), stderr=subprocess.STDOUT, start_new_session=True
+        )
+        time.sleep(2)  # Allow some time for the second server to start
 
-    server1_url = f"http://127.0.0.1:{port1}"
-    server2_url = f"http://127.0.0.1:{port2}"
+        print(f"✅ Both servers started on ports {self.server1_port} and {self.server2_port}!")
 
-    # Start the game on both servers
-    try:
-        requests.post(f"{server1_url}/start", params={"other_instance_url": server2_url, "interval": pong_time_ms})
-        requests.post(f"{server2_url}/start", params={"other_instance_url": server1_url, "interval": pong_time_ms})
-        print(f"✅ Game started! Pings will be exchanged every {pong_time_ms} ms between {server1_url} and {server2_url}.")
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error starting game: {e}")
+    def start_game(self, pong_time_ms):
+        """Start the game after starting both servers."""
+        print("🚀 Initializing the Pong game...")
 
-def pause_game():
-    """Pause the game."""
-    requests.post(f"{server1_url}/pause")
-    requests.post(f"{server2_url}/pause")
-    print("⏸️ Game paused.")
+        # Start both servers and set their URLs
+        self.start_servers()
 
-def resume_game():
-    """Resume the game."""
-    requests.post(f"{server1_url}/resume")
-    requests.post(f"{server2_url}/resume")
-    print("▶️ Game resumed.")
+        # Start the game on both servers
+        try:
+            requests.post(f"{self.server1_url}/start", params={"other_instance_url": self.server2_url, "interval": pong_time_ms})
+            requests.post(f"{self.server2_url}/start", params={"other_instance_url": self.server1_url, "interval": pong_time_ms})
+            print(f"✅ Game started! Pings will be exchanged every {pong_time_ms} ms between {self.server1_url} and {self.server2_url}.")
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error starting game: {e}")
 
-def stop_game():
-    """Stop the game."""
-    requests.post(f"{server1_url}/stop")
-    requests.post(f"{server2_url}/stop")
-    print("⏹️ Game stopped.")
+    def pause_game(self):
+        """Pause the game."""
+        if self.server1_url and self.server2_url:
+            requests.post(f"{self.server1_url}/pause")
+            requests.post(f"{self.server2_url}/pause")
+            print("⏸️ Game paused.")
+        else:
+            print("❌ Servers are not running. Start the game first.")
+
+    def resume_game(self):
+        """Resume the game."""
+        if self.server1_url and self.server2_url:
+            requests.post(f"{self.server1_url}/resume")
+            requests.post(f"{self.server2_url}/resume")
+            print("▶️ Game resumed.")
+        else:
+            print("❌ Servers are not running. Start the game first.")
+
+    def stop_game(self):
+        """Stop the game."""
+        if self.server1_url and self.server2_url:
+            requests.post(f"{self.server1_url}/stop")
+            requests.post(f"{self.server2_url}/stop")
+            print("⏹️ Game stopped.")
+        else:
+            print("❌ Servers are not running. Start the game first.")
 
 def main():
     parser = argparse.ArgumentParser(description="Pong Game CLI Tool")
@@ -74,15 +95,16 @@ def main():
     parser.add_argument("pong_time_ms", type=int, nargs="?", default=1000, help="Pong interval (ms) for 'start' command")
 
     args = parser.parse_args()
+    game_cli = PongGameCLI()
 
     if args.command == "start":
-        start_game(args.pong_time_ms)
+        game_cli.start_game(args.pong_time_ms)
     elif args.command == "pause":
-        pause_game()
+        game_cli.pause_game()
     elif args.command == "resume":
-        resume_game()
+        game_cli.resume_game()
     elif args.command == "stop":
-        stop_game()
+        game_cli.stop_game()
 
 if __name__ == "__main__":
     main()
