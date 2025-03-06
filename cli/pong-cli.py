@@ -36,7 +36,7 @@ class PongGameCLI:
             ["uvicorn", "server.main:app", "--host", "127.0.0.1", "--port", str(self.server1_port)],
             stdout=open(self.server1_log, "w"), stderr=subprocess.STDOUT, start_new_session=True
         )
-        time.sleep(1)  # Allow some time for the server to start
+        time.sleep(2)  # Allow some time for the server to start
 
         print(f"Starting server 2 on port {self.server2_port}, logging to {self.server2_log}...")
         subprocess.Popen(
