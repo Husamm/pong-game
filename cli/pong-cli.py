@@ -85,7 +85,12 @@ class PongGameCLI:
             requests.post(f"{self.server1_url}/start", params={"other_instance_url": self.server2_url, "interval": pong_time_ms})
             requests.post(f"{self.server2_url}/start", params={"other_instance_url": self.server1_url, "interval": pong_time_ms})
 
+
+            # Send the first ping from instance1 to instance2
+            print(f"âš¡ Server 1 ({self.server1_url}) starts the first ping to Server 2 ({self.server2_url})")
+            requests.post(f"{self.server1_url}/ping")
             print(f"✅ Game started! Pings will be exchanged every {pong_time_ms} ms between {self.server1_url} and {self.server2_url}.")
+            
         except requests.exceptions.RequestException as e:
             print(f"❌ Error starting game: {e}")
 
