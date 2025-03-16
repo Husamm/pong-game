@@ -48,17 +48,18 @@ class PongGame:
                 return  # Stop here until resumed
 
         if self.is_running:
-            log(f"⚡ [{self.id}] Sending ping to {self.other_instance_url} after {self.pong_time_ms} ms...")
+            other_instance_url = random.choice(self.other_instance_urls)
+            log(f"⚡ [{self.id}] Sending ping to {other_instance_url} after {self.pong_time_ms} ms...")
             async with httpx.AsyncClient() as client:
                 try:
-                    res = await client.post(f"{self.other_instance_url}/ping")
+                    res = await client.post(f"{other_instance_url}/ping")
                     log(f"✅ [{self.id}] Ping sent successfully! Response: {res.status_code}, {res.text}")
                 except Exception as e:
                     log(f"❌ [{self.id}] Failed to ping other instance: {e}")
 
     async def ping(self):
         """Handles incoming ping requests"""
-        if not self.is_running or not self.other_instance_url:
+        if not self.is_running:
             log(f"⚠️ [{self.id}] Ping received but game is paused or not started.")
             return {"message": "Game is paused or not started"}
 
@@ -70,14 +71,18 @@ class PongGame:
         
         return response
 
-    def start_game(self, other_instance_url: str, interval: int):
-        """Starts the game and initializes ping exchange"""
-        log(f"🚀 [{self.id}] - Start game called - other_instance_url: {other_instance_url}, interval: {interval} ms")
-        self.other_instance_url = other_instance_url
+    def start_game(self, other_instance_urls: list[str], interval: int):
+        """Starts the game and initializes ping exchange with two other instances"""
+        if self.is_running:
+            log(f"⚠️ [{self.id}] Game is already running.")
+            return {"message": "Game is already running"}
+        
+        log(f"🚀 [{self.id}] - Start game called - other_instance_urls: {other_instance_urls}, interval: {interval} ms")
+        self.other_instance_urls =  other_instance_urls
         self.pong_time_ms = interval
         self.is_running = True
         self.remaining_sleep_time = 0  # Reset remaining time tracking
-        log(f"✅ [{self.id}] Game started. Pinging {self.other_instance_url} every {self.pong_time_ms} ms.")
+        log(f"✅ [{self.id}] Game started. Pinging {self.other_instance_urls} every {self.pong_time_ms} ms.")
         return {"message": "Game started"}
 
     def pause_game(self):
@@ -124,8 +129,8 @@ async def ping():
     return await game.ping()
 
 @app.post("/start")
-async def start_game(other_instance_url: str, interval: int):
-    return game.start_game(other_instance_url, interval)
+async def start_game(other_instance_urls: list[str], interval: int):
+    return game.start_game(other_instance_urls, interval)
 
 @app.post("/pause")
 async def pause_game():
